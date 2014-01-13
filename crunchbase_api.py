@@ -1,4 +1,4 @@
-mitch 
+mitch - crunchbase
 
 
 import json, urllib
