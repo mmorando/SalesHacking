@@ -1,0 +1,154 @@
+LinkedIN 
+http://stockrt.github.io/p/emulating-a-browser-in-python-with-mechanize/
+
+
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+from bs4 import BeautifulSoup
+import urllib2, re, csv, sys, urllib, json, mechanize, os, time, random
+import mechanize
+import cookielib
+#http://stockrt.github.com/p/emulating-a-browser-in-python-with-mechanize/
+# Browser
+br = mechanize.Browser()
+cj = cookielib.LWPCookieJar()
+br.set_cookiejar(cj)
+ 
+# Browser options
+br.set_handle_equiv(True)
+br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+ 
+# Follows refresh 0 but not hangs on refresh > 0
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
+ 
+# User-Agent (this is cheating, ok?)
+br.addheaders = [('User-agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_2) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1309.0 Safari/537.17')]
+ 
+# Assumes list is in ~/data/starting/list.csv
+inpath = os.getenv("HOME")+"/data/starting/linkedin_test.csv"
+outpath = os.getenv("HOME")+"/data/finished/linkedin_test.csv"
+#field for outpath
+fields = ['First', 'Last', 'Company', 'New Title', 'New Company', 'Link']
+ 
+cos = csv.reader(open(inpath, 'rU'))
+i = 0
+for co in cos:
+    try: 
+        i += 1
+        if i < 6: 
+            continue
+        ins, new_title, new_company = {}, '', ''
+        first, last, company = co[0].strip(), co[1].strip(), co[2].strip()
+        burl = 'http://www.bing.com/search?q=%s %s %s site:linkedin.com' % (first, last, company)
+        r = br.open(burl.replace(' ', '%20'))
+        html = r.read()
+        soup = BeautifulSoup(html)
+        result = soup.find('div', { "class" : "sb_tlst" } )
+        if not hasattr(result, 'a'):
+            print "No link?", result
+            continue
+        if not result.a.has_key('href'):
+            print "No href?", result
+            continue
+        link = result.a['href']
+        r = br.open(link)
+        html = r.read()
+        soup = BeautifulSoup(html)
+        result = soup.find('p', { "class" : "headline-title title" }) if soup.find('p', { "class" : "headline-title title" }) else soup.find('ul', { "class" : "current" })
+        if not result:
+            continue
+        if result.string:
+            if ' at ' in result.string:
+                new_title, new_company = result.string.strip().split(' at ')
+        elif result.li:
+            if ' at ' in result.find("li").get_text():
+                new_title, new_company = result.find("li").get_text().strip().split(' at ')
+        if not new_company:
+            continue
+        if company not in new_company.strip():
+            ins['First'], ins['Last'], ins['Company'], ins['New Title'], ins['New Company'], ins['Link'] = first, last, company, new_title.strip(), new_company.strip(), link
+            f = open(outpath,'a')
+            dw = csv.DictWriter(f, fieldnames=fields)
+            dw.writerow(ins)
+            f.close()
+            print "%s - %s %s: was at %s, now at %s (%s)" % (i, ins['First'], ins['Last'], ins['Company'], ins['New Company'], ins['Link'])
+    except Exception as detail:
+        print "Failed on record %s with error %s" % (i, detail)
+        #c.close()
